@@ -522,6 +522,19 @@
     font-size: 48px;
     opacity: 0.3;
   }
+  .card-media .media-loader {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-media .media-loader img,
+  .card-media .media-loader video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
   .card-type-badge {
     position: absolute;
     top: 12px;
@@ -785,6 +798,84 @@
 // ===== Data Store =====
 const STORAGE_KEY = 'portfolio_works';
 
+// --- IndexedDB for large media files ---
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('PortfolioMedia', 1);
+    req.onupgradeneeded = function(e) {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('files')) {
+        db.createObjectStore('files', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = function(e) { resolve(e.target.result); };
+    req.onerror = function(e) { reject(e.target.error); };
+  });
+}
+
+function dbStore(id, blob) {
+  return openDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('files', 'readwrite');
+      tx.objectStore('files').put({ id, blob });
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  });
+}
+
+function dbRetrieve(id) {
+  return openDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('files', 'readonly');
+      const req = tx.objectStore('files').get(id);
+      req.onsuccess = () => { db.close(); resolve(req.result ? req.result.blob : null); };
+      req.onerror = () => { db.close(); reject(req.error); };
+    });
+  });
+}
+
+function dbDelete(id) {
+  return openDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('files', 'readwrite');
+      tx.objectStore('files').delete(id);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  });
+}
+
+// Blob URL cache — avoid recreating URLs on every render
+const blobURLCache = {};
+
+function revokeBlobURL(id) {
+  if (blobURLCache[id]) {
+    URL.revokeObjectURL(blobURLCache[id]);
+    delete blobURLCache[id];
+  }
+}
+
+async function getMediaURL(work) {
+  // If it's a dataUrl (legacy photos), return directly
+  if (work.dataUrl && !work.dbId) return work.dataUrl;
+  // If we have a dbId, fetch from IndexedDB
+  if (work.dbId) {
+    if (blobURLCache[work.id]) return blobURLCache[work.id];
+    try {
+      const blob = await dbRetrieve(work.dbId);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        blobURLCache[work.id] = url;
+        return url;
+      }
+    } catch (e) {
+      console.error('Failed to retrieve media:', e);
+    }
+  }
+  return null;
+}
+
 function loadWorks() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -934,7 +1025,7 @@ function onFileSelected(e) {
   }
 }
 
-function submitWork() {
+async function submitWork() {
   const title = document.getElementById('uploadTitle').value.trim();
   const desc = document.getElementById('uploadDesc').value.trim();
   const type = document.getElementById('uploadType').value;
@@ -944,25 +1035,53 @@ function submitWork() {
 
   if (type === 'photo' || type === 'video') {
     if (!pendingFile) { showToast('请选择文件'); return; }
-    const reader = new FileReader();
-    reader.onload = function() {
+
+    const isVideo = type === 'video';
+    const workId = genId();
+
+    // Show loading toast for large files
+    if (isVideo && pendingFile.size > 20 * 1024 * 1024) {
+      showToast('视频较大，正在处理中...');
+    }
+
+    try {
       const work = {
-        id: genId(),
+        id: workId,
         type: type,
         title: title,
         desc: desc,
-        dataUrl: reader.result,
         fileName: pendingFile.name,
         mimeType: pendingFile.type,
         createdAt: Date.now(),
       };
+
+      if (isVideo) {
+        // Video → store blob in IndexedDB
+        const dbId = 'vid_' + workId;
+        await dbStore(dbId, pendingFile);
+        work.dbId = dbId;
+        work.dataUrl = null;
+        // Also cache the blob URL immediately for instant preview
+        blobURLCache[work.id] = URL.createObjectURL(pendingFile);
+      } else {
+        // Photo → base64 in localStorage (photos are small enough)
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(pendingFile);
+        });
+        work.dataUrl = dataUrl;
+      }
+
       works.unshift(work);
       saveWorks(works);
       closeUploadForm();
       refreshAll();
       showToast('作品发布成功 ✨');
-    };
-    reader.readAsDataURL(pendingFile);
+    } catch (e) {
+      console.error('Upload failed:', e);
+      showToast('上传失败，请重试');
+    }
   } else {
     const work = {
       id: genId(),
@@ -1014,16 +1133,38 @@ function renderGallery() {
       </div>
     `;
   }).join('');
+
+  // Async: load actual media (videos from IndexedDB, photos from dataUrls)
+  hydrateMedia();
 }
 
 function renderCardMedia(w) {
-  if (w.type === 'photo' && w.dataUrl) {
-    return `<img src="${w.dataUrl}" alt="${escapeHtml(w.title)}" loading="lazy">`;
-  }
-  if (w.type === 'video' && w.dataUrl) {
-    return `<video src="${w.dataUrl}" muted preload="metadata"></video>`;
+  // Placeholder — real URLs loaded asynchronously by hydrateMedia()
+  if (w.type === 'photo' || w.type === 'video') {
+    return `<div class="media-loader" data-work-id="${w.id}" data-work-type="${w.type}">
+      <span class="media-placeholder">${getTypeIcon(w.type)}</span>
+    </div>`;
   }
   return `<span class="media-placeholder">${getTypeIcon(w.type)}</span>`;
+}
+
+async function hydrateMedia() {
+  const loaders = document.querySelectorAll('.media-loader');
+  for (const loader of loaders) {
+    const id = loader.dataset.workId;
+    const type = loader.dataset.workType;
+    const w = works.find(wk => wk.id === id);
+    if (!w) continue;
+
+    const url = await getMediaURL(w);
+    if (!url) continue;
+
+    if (type === 'photo') {
+      loader.innerHTML = `<img src="${url}" alt="${escapeHtml(w.title)}" loading="lazy">`;
+    } else if (type === 'video') {
+      loader.innerHTML = `<video src="${url}" muted preload="metadata" playsinline></video>`;
+    }
+  }
 }
 
 function escapeHtml(str) {
@@ -1033,7 +1174,7 @@ function escapeHtml(str) {
 }
 
 // ===== Detail Modal =====
-function openDetail(id, event) {
+async function openDetail(id, event) {
   if (event) {
     // Create ripple on the card
     const card = event.currentTarget;
@@ -1045,20 +1186,13 @@ function openDetail(id, event) {
 
   const container = document.getElementById('detailModalContainer');
   let mediaHtml = '';
-  if ((w.type === 'photo' || w.type === 'video') && w.dataUrl) {
-    mediaHtml = `
-      <div class="modal-media">
-        ${w.type === 'photo'
-          ? `<img src="${w.dataUrl}" alt="${escapeHtml(w.title)}">`
-          : `<video src="${w.dataUrl}" controls autoplay playsinline></video>`}
-      </div>`;
-  }
 
+  // Show modal immediately with placeholder
   container.innerHTML = `
     <div class="modal-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
       <div class="modal">
         <button class="modal-close" onclick="closeDetail()">✕</button>
-        ${mediaHtml}
+        <div class="modal-media" id="modalMedia"><div style="padding:40px;text-align:center;color:var(--text-tertiary);">加载中...</div></div>
         <div class="modal-content">
           <div class="modal-type">${getTypeLabel(w.type)}</div>
           <h3>${escapeHtml(w.title)}</h3>
@@ -1072,6 +1206,21 @@ function openDetail(id, event) {
     </div>
   `;
   document.body.style.overflow = 'hidden';
+
+  // Async: load media
+  if (w.type === 'photo' || w.type === 'video') {
+    const url = await getMediaURL(w);
+    const modalMedia = document.getElementById('modalMedia');
+    if (url && modalMedia) {
+      if (w.type === 'photo') {
+        modalMedia.innerHTML = `<img src="${url}" alt="${escapeHtml(w.title)}">`;
+      } else {
+        modalMedia.innerHTML = `<video src="${url}" controls autoplay playsinline></video>`;
+      }
+    } else if (modalMedia) {
+      modalMedia.innerHTML = `<div style="padding:60px;text-align:center;color:var(--text-tertiary);">无法加载媒体</div>`;
+    }
+  }
 }
 
 function closeDetail() {
@@ -1079,8 +1228,13 @@ function closeDetail() {
   document.body.style.overflow = '';
 }
 
-function deleteWork(id) {
+async function deleteWork(id) {
   if (!confirm('确定要删除这个作品吗？')) return;
+  const w = works.find(wk => wk.id === id);
+  if (w && w.dbId) {
+    await dbDelete(w.dbId).catch(() => {});
+    revokeBlobURL(id);
+  }
   works = works.filter(w => w.id !== id);
   saveWorks(works);
   closeDetail();
