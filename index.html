@@ -1166,11 +1166,13 @@ document.addEventListener('keydown', function(e) {
   const ctx = canvas.getContext('2d');
 
   let W, H;
-  const PCOUNT = 70;
+  const PCOUNT = 180;
   const particles = [];
-  const MOUSE_INFLUENCE = 120;
+  const ATTRACT_RADIUS = 280;    // particles within this range feel pull
+  const ATTRACT_INNER = 60;      // max pull strength inside this radius
   let mouseX = -999;
   let mouseY = -999;
+  let mouseOnScreen = false;
 
   function resize() {
     W = canvas.width = window.innerWidth;
@@ -1179,14 +1181,14 @@ document.addEventListener('keydown', function(e) {
   window.addEventListener('resize', resize);
   resize();
 
-  // Track mouse for subtle interaction
+  // Track mouse
   document.addEventListener('mousemove', function(e) {
     mouseX = e.clientX;
     mouseY = e.clientY;
+    mouseOnScreen = true;
   });
   document.addEventListener('mouseleave', function() {
-    mouseX = -999;
-    mouseY = -999;
+    mouseOnScreen = false;
   });
 
   // Create particles
@@ -1194,87 +1196,102 @@ document.addEventListener('keydown', function(e) {
     particles.push({
       x: Math.random() * W,
       y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.25,
-      vy: (Math.random() - 0.5) * 0.25,
-      r: Math.random() * 1.5 + 0.8,         // 0.8 ~ 2.3px
-      opacity: Math.random() * 0.35 + 0.08,  // 0.08 ~ 0.43
-      // Unique phase for each particle's sine drift
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.2,
+      // home position — where this particle drifts back when mouse is away
+      homeX: Math.random() * W,
+      homeY: Math.random() * H,
+      r: Math.random() * 1.6 + 0.6,          // 0.6 ~ 2.2px
+      opacity: Math.random() * 0.35 + 0.06,   // 0.06 ~ 0.41
       phaseX: Math.random() * Math.PI * 2,
       phaseY: Math.random() * Math.PI * 2,
-      freqX: 0.0003 + Math.random() * 0.0007,
-      freqY: 0.0003 + Math.random() * 0.0007,
-      amp: 0.15 + Math.random() * 0.45,
+      freqX: 0.0002 + Math.random() * 0.0006,
+      freqY: 0.0002 + Math.random() * 0.0006,
     });
   }
 
   function draw(timestamp) {
     requestAnimationFrame(draw);
 
-    // Clear
-    ctx.clearRect(0, 0, W, H);
-
-    // Subtle base haze — very dark, slight warm tint
-    ctx.fillStyle = 'rgba(8, 8, 10, 0.15)';
+    // Fade trail: semi-transparent clear for motion blur effect
+    ctx.fillStyle = 'rgba(8, 8, 10, 0.18)';
     ctx.fillRect(0, 0, W, H);
 
-    const t = timestamp * 0.001; // seconds
+    const t = timestamp * 0.001;
 
     // Update & draw particles
     for (let i = 0; i < PCOUNT; i++) {
       const p = particles[i];
 
-      // Organic drift: sine-based flow
-      p.vx += Math.sin(t * 0.7 + p.phaseX) * p.freqX;
-      p.vy += Math.cos(t * 0.6 + p.phaseY) * p.freqY;
+      // --- Forces ---
 
-      // Damping
-      p.vx *= 0.998;
-      p.vy *= 0.998;
+      // 1. Organic sine drift (always active, subtle)
+      p.vx += Math.sin(t * 0.5 + p.phaseX) * p.freqX;
+      p.vy += Math.cos(t * 0.45 + p.phaseY) * p.freqY;
 
-      // Clamp speed
-      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-      if (speed > 0.5) {
-        p.vx = (p.vx / speed) * 0.5;
-        p.vy = (p.vy / speed) * 0.5;
+      // 2. Mouse attraction — particles gather toward cursor
+      if (mouseOnScreen) {
+        const dx = mouseX - p.x;
+        const dy = mouseY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < ATTRACT_RADIUS && dist > 0.1) {
+          // Stronger pull when closer; strongest inside ATTRACT_INNER
+          const effectiveDist = Math.max(dist, ATTRACT_INNER);
+          const strength = (1 - (effectiveDist - ATTRACT_INNER) / (ATTRACT_RADIUS - ATTRACT_INNER));
+          const pull = strength * strength * 0.018; // quadratic falloff for smooth gathering
+          p.vx += (dx / dist) * pull;
+          p.vy += (dy / dist) * pull;
+        }
+      } else {
+        // 3. When mouse leaves, drift slowly back toward home positions
+        const hdx = p.homeX - p.x;
+        const hdy = p.homeY - p.y;
+        const hdist = Math.sqrt(hdx * hdx + hdy * hdy);
+        if (hdist > 5) {
+          p.vx += (hdx / hdist) * 0.003;
+          p.vy += (hdy / hdist) * 0.003;
+        }
       }
 
-      // Move
+      // --- Physics ---
+      p.vx *= 0.996;   // light damping
+      p.vy *= 0.996;
+
+      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      const maxSpeed = mouseOnScreen ? 0.9 : 0.4;
+      if (speed > maxSpeed) {
+        p.vx = (p.vx / speed) * maxSpeed;
+        p.vy = (p.vy / speed) * maxSpeed;
+      }
+
       p.x += p.vx;
       p.y += p.vy;
 
-      // Wrap screen edges
-      if (p.x < -20) p.x = W + 20;
-      if (p.x > W + 20) p.x = -20;
-      if (p.y < -20) p.y = H + 20;
-      if (p.y > H + 20) p.y = -20;
+      // Soft boundary wrapping
+      if (p.x < -30) p.x = W + 30;
+      if (p.x > W + 30) p.x = -30;
+      if (p.y < -30) p.y = H + 30;
+      if (p.y > H + 30) p.y = -30;
 
-      // Subtle mouse repulsion
-      const dx = p.x - mouseX;
-      const dy = p.y - mouseY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < MOUSE_INFLUENCE && dist > 0) {
-        const force = (MOUSE_INFLUENCE - dist) / MOUSE_INFLUENCE;
-        p.vx += (dx / dist) * force * 0.3;
-        p.vy += (dy / dist) * force * 0.3;
-      }
-
-      // Draw particle (soft glow dot)
-      const alpha = p.opacity * (0.7 + 0.3 * Math.sin(t * 1.3 + p.phaseX));
+      // --- Draw ---
+      const alpha = p.opacity * (0.7 + 0.3 * Math.sin(t * 1.1 + p.phaseX));
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(210, 210, 220, ${alpha})`;
+      ctx.fillStyle = `rgba(210, 210, 225, ${alpha})`;
       ctx.fill();
 
-      // Occasional larger glow
-      if (i % 7 === 0) {
+      // Larger glow on every 6th particle
+      if (i % 6 === 0) {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(200, 200, 210, ${alpha * 0.18})`;
+        ctx.arc(p.x, p.y, p.r * 2.8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(195, 195, 215, ${alpha * 0.14})`;
         ctx.fill();
       }
     }
 
-    // Draw connections between nearby particles
+    // --- Connections ---
+    // When mouse is on screen, increase connection visibility near cursor
     for (let i = 0; i < PCOUNT; i++) {
       for (let j = i + 1; j < PCOUNT; j++) {
         const a = particles[i];
@@ -1282,15 +1299,25 @@ document.addEventListener('keydown', function(e) {
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxDist = 140;
+        const maxDist = 130;
 
         if (dist < maxDist) {
-          const lineAlpha = (1 - dist / maxDist) * 0.06;
+          // Boost connection opacity when both particles are near mouse
+          let boost = 1;
+          if (mouseOnScreen) {
+            const da = Math.sqrt((a.x - mouseX) ** 2 + (a.y - mouseY) ** 2);
+            const db = Math.sqrt((b.x - mouseX) ** 2 + (b.y - mouseY) ** 2);
+            const near = Math.min(da, db);
+            if (near < ATTRACT_RADIUS) {
+              boost = 1 + (1 - near / ATTRACT_RADIUS) * 2.5;
+            }
+          }
+          const lineAlpha = (1 - dist / maxDist) * 0.055 * boost;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = `rgba(200, 200, 220, ${lineAlpha})`;
-          ctx.lineWidth = 0.4;
+          ctx.strokeStyle = `rgba(190, 190, 215, ${lineAlpha})`;
+          ctx.lineWidth = 0.35;
           ctx.stroke();
         }
       }
