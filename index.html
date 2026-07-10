@@ -729,7 +729,46 @@
     background: rgba(255,77,77,0.1);
     border-color: #ff4d4d;
   }
+  /* ===== Auth / Comments / Likes ===== */
+  .auth-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; font-size: 18px; display: flex; align-items: center;
+    justify-content: center; transition: all var(--transition-fast);
+  }
+  .auth-btn:hover { border-color: var(--text-secondary); transform: scale(1.08); }
+  .auth-btn.logged-in { border-color: var(--accent); }
+
+  .comment-section { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px; }
+  .comment-section h4 { font-size: 14px; margin-bottom: 14px; color: var(--text-secondary); }
+  .comment-input-wrap { display: flex; gap: 8px; margin-bottom: 16px; }
+  .comment-input-wrap input { flex: 1; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; color: var(--text-primary); font-family: var(--font); font-size: 13px; }
+  .comment-input-wrap input:focus { outline: none; border-color: var(--accent); }
+  .comment-input-wrap .btn { flex-shrink: 0; padding: 8px 16px; font-size: 12px; }
+  .comment-list { list-style: none; max-height: 260px; overflow-y: auto; }
+  .comment-item { padding: 10px 0; border-bottom: 1px solid rgba(128,128,128,0.08); }
+  .comment-item:last-child { border-bottom: none; }
+  .comment-item .comment-user { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .comment-item .comment-text { font-size: 13px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; }
+  .comment-item .comment-time { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+  .comment-login-hint { font-size: 12px; color: var(--text-tertiary); text-align: center; }
+  .comment-login-hint a { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .comment-login-hint a:hover { text-decoration: underline; }
+
+  .like-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; font-family: var(--font); font-size: 13px; transition: all var(--transition-fast); }
+  .like-btn:hover { border-color: #ff4d4d; color: #ff4d4d; }
+  .like-btn.liked { background: rgba(255,77,77,0.12); border-color: var(--accent); color: var(--accent); }
+  .like-btn .like-heart { transition: transform 0.3s var(--transition-spring); display: inline-block; }
+  .like-btn.liked .like-heart { animation: heartPop 0.4s var(--transition-spring); }
+  @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+
+  .user-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .user-badge .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -740,6 +779,7 @@
 <nav class="nav" id="nav">
   <a href="#" class="nav-logo">Port<span>folio</span></a>
   <div class="nav-actions">
+    <button class="auth-btn" id="authBtn" onclick="openAuthModal()" title="登录 / 注册">👤</button>
     <button class="theme-toggle" id="themeToggle" aria-label="切换深色/亮色模式" title="切换深色/亮色模式">
       <span class="theme-icon-dark">☀️</span>
       <span class="theme-icon-light">🌙</span>
@@ -800,6 +840,122 @@
 <div id="detailModalContainer"></div>
 
 <script>
+// ===== Firebase Config =====
+// TODO: 替换为你自己的 Firebase 配置 → https://console.firebase.google.com
+const firebaseConfig = {
+  apiKey: "AIzaSyD-PLACEHOLDER-KEY",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxx"
+};
+
+// Init Firebase (graceful fallback if not configured)
+let db, auth, storage, fbReady = false;
+try {
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+  storage = firebase.storage();
+  fbReady = true;
+} catch(e) { console.warn('Firebase not configured, using local-only mode.'); }
+
+// ===== Auth State =====
+let currentUser = null;
+let authModalOpen = false;
+
+if (fbReady) {
+  auth.onAuthStateChanged(user => {
+    currentUser = user;
+    updateAuthUI();
+    // Refresh gallery to update like states
+    if (works.length > 0) { renderGallery(); updateFilterCounts(); }
+  });
+}
+
+function updateAuthUI() {
+  const btn = document.getElementById('authBtn');
+  if (!btn) return;
+  if (currentUser) {
+    btn.textContent = currentUser.displayName ? currentUser.displayName[0].toUpperCase() : '👤';
+    btn.title = currentUser.displayName || currentUser.email;
+    btn.classList.add('logged-in');
+  } else {
+    btn.textContent = '👤';
+    btn.title = '登录 / 注册';
+    btn.classList.remove('logged-in');
+  }
+}
+
+function openAuthModal() {
+  if (!fbReady) { showToast('请先配置 Firebase 以启用用户功能'); return; }
+  if (currentUser) {
+    if (confirm(`当前登录: ${currentUser.displayName || currentUser.email}\n\n是否退出登录?`)) {
+      auth.signOut();
+    }
+    return;
+  }
+  const container = document.getElementById('uploadFormContainer');
+  container.innerHTML = `
+    <div class="upload-form-overlay" onclick="if(event.target===this)closeAuthModal()">
+      <div class="upload-form" onclick="event.stopPropagation()">
+        <h3 id="authTitle">登录</h3>
+        <div class="form-group"><label>邮箱</label><input type="email" id="authEmail" placeholder="your@email.com"></div>
+        <div class="form-group"><label>密码</label><input type="password" id="authPassword" placeholder="至少6位"></div>
+        <div class="form-group" id="authNameGroup" style="display:none;"><label>昵称</label><input type="text" id="authName" placeholder="怎么称呼你?"></div>
+        <p id="authError" style="color:#ff4d4d;font-size:12px;display:none;"></p>
+        <div class="form-actions">
+          <a id="authSwitch" style="color:var(--accent);cursor:pointer;font-size:13px;align-self:center;" onclick="toggleAuthMode()">没有账号? 注册</a>
+          <button class="btn btn-accent ripple" id="authSubmitBtn" onclick="handleAuth()">登录</button>
+        </div>
+      </div>
+    </div>
+  `;
+  authModalOpen = true;
+  document.getElementById('authEmail').focus();
+}
+function closeAuthModal() {
+  document.getElementById('uploadFormContainer').innerHTML = '';
+  authModalOpen = false;
+}
+let authMode = 'login';
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  document.getElementById('authTitle').textContent = authMode === 'login' ? '登录' : '注册';
+  document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? '登录' : '注册';
+  document.getElementById('authNameGroup').style.display = authMode === 'register' ? 'block' : 'none';
+  document.getElementById('authSwitch').textContent = authMode === 'login' ? '没有账号? 注册' : '已有账号? 登录';
+  document.getElementById('authError').style.display = 'none';
+}
+async function handleAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const name = document.getElementById('authName')?.value.trim();
+  const errEl = document.getElementById('authError');
+  errEl.style.display = 'none';
+
+  if (!email || !password) { errEl.textContent = '请填写邮箱和密码'; errEl.style.display = 'block'; return; }
+  if (password.length < 6) { errEl.textContent = '密码至少6位'; errEl.style.display = 'block'; return; }
+  if (authMode === 'register' && !name) { errEl.textContent = '请填写昵称'; errEl.style.display = 'block'; return; }
+
+  try {
+    if (authMode === 'register') {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await cred.user.updateProfile({ displayName: name });
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+    closeAuthModal();
+    showToast(authMode === 'register' ? '注册成功 🎉' : '欢迎回来 👋');
+  } catch(e) {
+    errEl.textContent = e.code === 'auth/email-already-in-use' ? '该邮箱已注册' :
+      e.code === 'auth/invalid-credential' ? '邮箱或密码错误' :
+      e.code === 'auth/weak-password' ? '密码太弱，至少6位' : e.message;
+    errEl.style.display = 'block';
+  }
+}
+
 // ===== Data Store =====
 const STORAGE_KEY = 'portfolio_works';
 
@@ -879,6 +1035,128 @@ async function getMediaURL(work) {
     }
   }
   return null;
+}
+
+// ===== Firestore Sync =====
+async function syncWorksToFirestore(work) {
+  if (!fbReady || !currentUser) return;
+  try {
+    await db.collection('works').doc(work.id).set({
+      id: work.id,
+      type: work.type,
+      title: work.title,
+      desc: work.desc,
+      fileName: work.fileName || '',
+      mimeType: work.mimeType || '',
+      authorId: currentUser.uid,
+      authorName: currentUser.displayName || currentUser.email,
+      createdAt: work.createdAt,
+      likeCount: 0,
+    });
+  } catch(e) { console.error('Firestore sync error:', e); }
+}
+
+async function uploadMediaToStorage(workId, file) {
+  if (!fbReady || !currentUser) return null;
+  try {
+    const ref = storage.ref().child(`media/${workId}/${file.name}`);
+    await ref.put(file);
+    return await ref.getDownloadURL();
+  } catch(e) { console.error('Storage upload error:', e); return null; }
+}
+
+async function loadWorksFromFirestore() {
+  if (!fbReady) return [];
+  try {
+    const snap = await db.collection('works').orderBy('createdAt', 'desc').get();
+    const fbWorks = [];
+    snap.forEach(doc => fbWorks.push(doc.data()));
+    return fbWorks;
+  } catch(e) { console.error('Firestore load error:', e); return []; }
+}
+
+// ===== Likes =====
+async function toggleLike(workId) {
+  if (!fbReady || !currentUser) { showToast('请先登录'); openAuthModal(); return; }
+  try {
+    const likeRef = db.collection('works').doc(workId).collection('likes').doc(currentUser.uid);
+    const doc = await likeRef.get();
+    const btn = document.getElementById('likeBtn');
+    const countEl = document.getElementById('likeCount');
+    const w = works.find(wk => wk.id === workId);
+
+    if (doc.exists) {
+      await likeRef.delete();
+      await db.collection('works').doc(workId).update({ likeCount: firebase.firestore.FieldValue.increment(-1) });
+      if (btn) { btn.classList.remove('liked'); btn.querySelector('.like-heart').textContent = '🤍'; }
+      if (countEl) countEl.textContent = Math.max(0, (w.likeCount || 1) - 1);
+      if (w) w.likeCount = Math.max(0, (w.likeCount || 1) - 1);
+    } else {
+      await likeRef.set({ createdAt: Date.now() });
+      await db.collection('works').doc(workId).update({ likeCount: firebase.firestore.FieldValue.increment(1) });
+      if (btn) { btn.classList.add('liked'); btn.querySelector('.like-heart').textContent = '❤️'; }
+      if (countEl) countEl.textContent = (w.likeCount || 0) + 1;
+      if (w) w.likeCount = (w.likeCount || 0) + 1;
+    }
+  } catch(e) { console.error('Like error:', e); }
+}
+
+async function getUserLikes() {
+  if (!fbReady || !currentUser) return new Set();
+  try {
+    const snap = await db.collectionGroup('likes').where(firebase.firestore.FieldPath.documentId(), '==', currentUser.uid).get();
+    const liked = new Set();
+    snap.forEach(doc => {
+      // doc.ref.parent.parent.id is the workId
+      const workId = doc.ref.parent.parent.id;
+      liked.add(workId);
+    });
+    return liked;
+  } catch(e) { return new Set(); }
+}
+
+// ===== Comments =====
+async function postComment(workId, text) {
+  if (!fbReady || !currentUser) { showToast('请先登录'); openAuthModal(); return; }
+  if (!text || !text.trim()) return;
+  try {
+    await db.collection('works').doc(workId).collection('comments').add({
+      userId: currentUser.uid,
+      userName: currentUser.displayName || currentUser.email,
+      text: text.trim(),
+      createdAt: Date.now(),
+    });
+    // Clear input and refresh comments
+    const input = document.getElementById('commentInput');
+    if (input) input.value = '';
+    const comments = await loadComments(workId);
+    renderComments(comments);
+  } catch(e) { console.error('Comment error:', e); }
+}
+
+async function loadComments(workId) {
+  if (!fbReady) return [];
+  try {
+    const snap = await db.collection('works').doc(workId).collection('comments').orderBy('createdAt', 'asc').get();
+    const comments = [];
+    snap.forEach(doc => comments.push({ id: doc.id, ...doc.data() }));
+    return comments;
+  } catch(e) { return []; }
+}
+
+// ===== Delete from Firestore =====
+async function deleteWorkFromFirestore(workId) {
+  if (!fbReady) return;
+  try {
+    // Delete subcollections
+    const batch = db.batch();
+    const likesSnap = await db.collection('works').doc(workId).collection('likes').get();
+    likesSnap.forEach(doc => batch.delete(doc.ref));
+    const commentsSnap = await db.collection('works').doc(workId).collection('comments').get();
+    commentsSnap.forEach(doc => batch.delete(doc.ref));
+    batch.delete(db.collection('works').doc(workId));
+    await batch.commit();
+  } catch(e) { console.error('Firestore delete error:', e); }
 }
 
 function loadWorks() {
@@ -1080,6 +1358,15 @@ async function submitWork() {
 
       works.unshift(work);
       saveWorks(works);
+
+      // Sync to Firebase in background
+      syncWorksToFirestore(work);
+      if (isVideo && fbReady && currentUser) {
+        uploadMediaToStorage(workId, pendingFile).then(url => {
+          if (url) db.collection('works').doc(workId).update({ storageUrl: url });
+        });
+      }
+
       closeUploadForm();
       refreshAll();
       showToast('作品发布成功 ✨');
@@ -1098,6 +1385,7 @@ async function submitWork() {
     };
     works.unshift(work);
     saveWorks(works);
+    syncWorksToFirestore(work);
     closeUploadForm();
     refreshAll();
     showToast('作品发布成功 ✨');
@@ -1181,7 +1469,6 @@ function escapeHtml(str) {
 // ===== Detail Modal =====
 async function openDetail(id, event) {
   if (event) {
-    // Create ripple on the card
     const card = event.currentTarget;
     createRipple(event, card);
   }
@@ -1190,9 +1477,10 @@ async function openDetail(id, event) {
   if (!w) return;
 
   const container = document.getElementById('detailModalContainer');
-  let mediaHtml = '';
+  const authorName = w.authorName || '匿名';
+  const authorInitial = authorName[0].toUpperCase();
 
-  // Show modal immediately with placeholder
+  // Show modal immediately with placeholder + comments section
   container.innerHTML = `
     <div class="modal-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
       <div class="modal">
@@ -1201,10 +1489,29 @@ async function openDetail(id, event) {
         <div class="modal-content">
           <div class="modal-type">${getTypeLabel(w.type)}</div>
           <h3>${escapeHtml(w.title)}</h3>
+          <div class="user-badge" style="margin-bottom:12px;"><span class="avatar">${escapeHtml(authorInitial)}</span>${escapeHtml(authorName)}</div>
           <p>${escapeHtml(w.desc)}</p>
           <div class="modal-date">${formatDate(w.createdAt)}</div>
           <div class="modal-actions">
-            <button class="btn btn-delete" onclick="deleteWork('${w.id}')">🗑 删除</button>
+            <button class="like-btn" id="likeBtn" onclick="toggleLike('${w.id}')">
+              <span class="like-heart">🤍</span> <span id="likeCount">${w.likeCount || 0}</span>
+            </button>
+            ${(currentUser && currentUser.uid === w.authorId) ? `<button class="btn btn-delete" onclick="deleteWork('${w.id}')">🗑 删除</button>` : ''}
+          </div>
+          <!-- Comments -->
+          <div class="comment-section">
+            <h4>💬 评论</h4>
+            <div id="commentArea">
+              ${fbReady && currentUser ? `
+                <div class="comment-input-wrap">
+                  <input type="text" id="commentInput" placeholder="写下你的想法..." maxlength="300" onkeydown="if(event.key==='Enter')postComment('${w.id}',document.getElementById('commentInput').value)">
+                  <button class="btn btn-accent ripple" onclick="postComment('${w.id}',document.getElementById('commentInput').value)">发送</button>
+                </div>
+              ` : `
+                <p class="comment-login-hint"><a onclick="closeDetail();openAuthModal();">登录</a> 后即可评论</p>
+              `}
+              <ul class="comment-list" id="commentList"><li style="color:var(--text-tertiary);font-size:13px;">加载评论中...</li></ul>
+            </div>
           </div>
         </div>
       </div>
@@ -1226,11 +1533,38 @@ async function openDetail(id, event) {
       modalMedia.innerHTML = `<div style="padding:60px;text-align:center;color:var(--text-tertiary);">无法加载媒体</div>`;
     }
   }
+
+  // Async: load comments + update like state
+  if (fbReady) {
+    loadComments(w.id).then(renderComments);
+    getUserLikes().then(liked => {
+      if (liked.has(w.id)) {
+        const btn = document.getElementById('likeBtn');
+        if (btn) { btn.classList.add('liked'); btn.querySelector('.like-heart').textContent = '❤️'; }
+      }
+    });
+  }
 }
 
 function closeDetail() {
   document.getElementById('detailModalContainer').innerHTML = '';
   document.body.style.overflow = '';
+}
+
+function renderComments(comments) {
+  const list = document.getElementById('commentList');
+  if (!list) return;
+  if (!comments || comments.length === 0) {
+    list.innerHTML = '<li style="color:var(--text-tertiary);font-size:13px;">还没有评论，来说两句吧</li>';
+    return;
+  }
+  list.innerHTML = comments.map(c => `
+    <li class="comment-item">
+      <div class="comment-user">${escapeHtml(c.userName || '匿名')}</div>
+      <div class="comment-text">${escapeHtml(c.text)}</div>
+      <div class="comment-time">${formatDate(c.createdAt)}</div>
+    </li>
+  `).join('');
 }
 
 async function deleteWork(id) {
@@ -1240,6 +1574,7 @@ async function deleteWork(id) {
     await dbDelete(w.dbId).catch(() => {});
     revokeBlobURL(id);
   }
+  await deleteWorkFromFirestore(id);
   works = works.filter(w => w.id !== id);
   saveWorks(works);
   closeDetail();
@@ -1346,15 +1681,26 @@ function refreshAll() {
 }
 
 // ===== Init =====
-function init() {
+async function init() {
   setupButtonRipples();
   setupFilters();
   setupDragDrop();
   setupNavScroll();
-  refreshAll();
 
-  // Re-setup filter buttons after render (they are already in DOM)
-  // Actually we need to re-bind after refreshAll because filter bar is static
+  // Load Firestore works + merge with local
+  if (fbReady) {
+    try {
+      const fbWorks = await loadWorksFromFirestore();
+      const localWorks = loadWorks();
+      // Merge: Firestore works take priority, keep local-only works
+      const fbIds = new Set(fbWorks.map(w => w.id));
+      const merged = [...fbWorks, ...localWorks.filter(w => !fbIds.has(w.id))];
+      works = merged;
+      saveWorks(merged);
+    } catch(e) { console.error('Failed to load from Firestore:', e); }
+  }
+
+  refreshAll();
 }
 
 document.addEventListener('DOMContentLoaded', init);
