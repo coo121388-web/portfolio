@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio · 作品集</title>
+<style>
+  /* ===== Reset & Base ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-hover: #1c1c1c;
+    --border: #2a2a2a;
+    --text-primary: #f0f0f0;
+    --text-secondary: #888;
+    --text-tertiary: #555;
+    --accent: #ff4d4d;
+    --accent-glow: rgba(255, 77, 77, 0.3);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --transition-fast: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+    --transition-smooth: 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+    --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== Scrollbar ===== */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ===== Ripple Container ===== */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+  .ripple::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(0);
+    pointer-events: none;
+  }
+  .ripple.animating::after {
+    animation: ripple-wave 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+
+  @keyframes ripple-wave {
+    0%   { transform: scale(0); opacity: 1; }
+    100% { transform: scale(4); opacity: 0; }
+  }
+
+  /* ===== Nav ===== */
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.3s, backdrop-filter 0.3s;
+  }
+  .nav.scrolled {
+    background: rgba(10, 10, 10, 0.75);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+  .nav-logo span { color: var(--accent); }
+
+  .nav-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border: none;
+    border-radius: 24px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary {
+    background: var(--text-primary);
+    color: var(--bg);
+  }
+  .btn-primary:hover {
+    background: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(255, 255, 255, 0.15);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover {
+    border-color: #555;
+    background: var(--surface-hover);
+  }
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-accent:hover {
+    background: #ff6b6b;
+    box-shadow: 0 8px 30px var(--accent-glow);
+  }
+
+  /* ===== Hero ===== */
+  .hero {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 120px 32px 60px;
+    position: relative;
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s var(--transition-spring) both;
+    animation-delay: 0.1s;
+  }
+  .hero h1 {
+    font-size: clamp(40px, 8vw, 80px);
+    font-weight: 700;
+    letter-spacing: -2px;
+    line-height: 1.05;
+    margin-bottom: 20px;
+    animation: fadeUp 0.8s var(--transition-spring) both;
+    animation-delay: 0.2s;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .hero p {
+    font-size: 18px;
+    color: var(--text-secondary);
+    max-width: 500px;
+    animation: fadeUp 0.8s var(--transition-spring) both;
+    animation-delay: 0.35s;
+  }
+  .hero-scroll {
+    margin-top: 48px;
+    animation: fadeUp 0.8s var(--transition-spring) both;
+    animation-delay: 0.5s;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+  .hero-scroll::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 32px;
+    background: var(--border);
+    margin: 8px auto 0;
+    animation: scrollPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50%      { opacity: 1;   transform: scaleY(1.5); }
+  }
+
+  /* ===== Upload Zone ===== */
+  .upload-section {
+    max-width: 800px;
+    margin: 0 auto 80px;
+    padding: 0 32px;
+  }
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    position: relative;
+    background: var(--surface);
+  }
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: #555;
+    background: var(--surface-hover);
+  }
+  .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(255, 77, 77, 0.03);
+    transform: scale(1.01);
+  }
+  .upload-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: var(--surface-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    transition: all var(--transition-spring);
+  }
+  .upload-zone:hover .upload-icon {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+  }
+  .upload-zone h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .upload-zone p {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .upload-types {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .upload-type-tag {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: transparent;
+    font-family: var(--font);
+  }
+  .upload-type-tag:hover,
+  .upload-type-tag.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(255, 77, 77, 0.06);
+  }
+  .upload-type-tag.active {
+    background: rgba(255, 77, 77, 0.12);
+  }
+
+  /* upload form popup */
+  .upload-form-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  .upload-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    width: 90%;
+    max-width: 500px;
+    animation: scaleIn 0.4s var(--transition-spring);
+  }
+  .upload-form h3 { font-size: 20px; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color var(--transition-fast);
+  }
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .form-group textarea { min-height: 100px; }
+  .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+  .file-preview { margin-top: 10px; }
+  .file-preview img { max-width: 100%; max-height: 200px; border-radius: var(--radius-sm); }
+  .file-preview video { max-width: 100%; max-height: 200px; border-radius: var(--radius-sm); }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* ===== Filter Bar ===== */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+    padding: 0 32px;
+  }
+  .filter-btn {
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .filter-btn:hover {
+    border-color: #555;
+    color: var(--text-primary);
+  }
+  .filter-btn.active {
+    background: var(--text-primary);
+    color: var(--bg);
+    border-color: var(--text-primary);
+  }
+  .filter-count {
+    font-size: 11px;
+    opacity: 0.5;
+    margin-left: 4px;
+  }
+
+  /* ===== Gallery ===== */
+  .gallery-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  .gallery.empty {
+    display: flex;
+    justify-content: center;
+    padding: 80px 0;
+  }
+  .empty-state {
+    text-align: center;
+    color: var(--text-tertiary);
+  }
+  .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state p { font-size: 14px; }
+
+  /* ===== Card ===== */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    position: relative;
+    /* for ripple */
+  }
+  .card:hover {
+    transform: translateY(-6px);
+    border-color: #444;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+  }
+  .card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  .card-media {
+    aspect-ratio: 4/3;
+    background: var(--surface-hover);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s var(--transition-smooth);
+  }
+  .card:hover .card-media img {
+    transform: scale(1.04);
+  }
+  .card-media video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .card-media .media-placeholder {
+    font-size: 48px;
+    opacity: 0.3;
+  }
+  .card-type-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .card-body {
+    padding: 20px;
+  }
+  .card-body h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+  .card-body p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.5;
+  }
+  .card-body .card-meta {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  /* ===== Card Ripple on click ===== */
+  .card-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(0);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .card-ripple.animate {
+    animation: cardRipple 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+  @keyframes cardRipple {
+    to { transform: scale(8); opacity: 0; }
+  }
+
+  /* ===== Detail Modal ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 720px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: scaleIn 0.45s var(--transition-spring);
+    position: relative;
+  }
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+  }
+  .modal-close:hover {
+    background: rgba(255,255,255,0.2);
+    transform: rotate(90deg);
+  }
+  .modal-media {
+    width: 100%;
+    max-height: 50vh;
+    overflow: hidden;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: #000;
+  }
+  .modal-media img,
+  .modal-media video {
+    width: 100%;
+    display: block;
+  }
+  .modal-content { padding: 28px; }
+  .modal-content .modal-type {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .modal-content h3 { font-size: 24px; font-weight: 700; margin-bottom: 12px; }
+  .modal-content p { color: var(--text-secondary); font-size: 15px; line-height: 1.7; }
+  .modal-content .modal-date {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+  /* ===== Toast ===== */
+  .toast-container {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  .toast {
+    padding: 12px 24px;
+    border-radius: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 13px;
+    animation: toastIn 0.4s var(--transition-spring), toastOut 0.3s ease 2.5s forwards;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.9); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  }
+
+  /* ===== Footer ===== */
+  .footer {
+    text-align: center;
+    padding: 40px 32px;
+    border-top: 1px solid var(--border);
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 640px) {
+    .nav { padding: 12px 16px; }
+    .hero { padding: 100px 20px 40px; }
+    .gallery { grid-template-columns: 1fr; gap: 14px; }
+    .upload-zone { padding: 40px 20px; }
+    .modal { width: 95%; max-height: 90vh; }
+  }
+
+  /* ===== Delete btn in modal ===== */
+  .btn-delete {
+    background: transparent;
+    color: #ff4d4d;
+    border: 1px solid rgba(255,77,77,0.3);
+  }
+  .btn-delete:hover {
+    background: rgba(255,77,77,0.1);
+    border-color: #ff4d4d;
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav" id="nav">
+  <a href="#" class="nav-logo">Port<span>folio</span></a>
+  <div class="nav-actions">
+    <button class="btn btn-outline ripple" onclick="scrollToUpload()">上传作品</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">Creative Portfolio</div>
+  <h1>每一帧都是<em>审美</em><br>每个想法都有<em>灵魂</em></h1>
+  <p>摄影、影像、文字、灵感 —— 这里陈列着我对世界的感知与想象。</p>
+  <div class="hero-scroll">向下滚动探索</div>
+</section>
+
+<!-- Upload Section -->
+<section class="upload-section" id="upload-section">
+  <div class="upload-zone" id="uploadZone" onclick="openUploadForm()">
+    <div class="upload-icon">＋</div>
+    <h3>分享你的作品</h3>
+    <p>拖拽文件到此处，或点击选择 · 支持图片、视频、文字、创意</p>
+    <div class="upload-types">
+      <span class="upload-type-tag">📷 照片</span>
+      <span class="upload-type-tag">🎬 视频</span>
+      <span class="upload-type-tag">✍️ 文字</span>
+      <span class="upload-type-tag">💡 创意</span>
+    </div>
+  </div>
+</section>
+
+<!-- Filter Bar -->
+<div class="filter-bar" id="filterBar">
+  <button class="filter-btn active" data-filter="all">全部<span class="filter-count" id="countAll">0</span></button>
+  <button class="filter-btn" data-filter="photo">📷 照片<span class="filter-count" id="countPhoto">0</span></button>
+  <button class="filter-btn" data-filter="video">🎬 视频<span class="filter-count" id="countVideo">0</span></button>
+  <button class="filter-btn" data-filter="text">✍️ 文字<span class="filter-count" id="countText">0</span></button>
+  <button class="filter-btn" data-filter="idea">💡 创意<span class="filter-count" id="countIdea">0</span></button>
+</div>
+
+<!-- Gallery -->
+<section class="gallery-section">
+  <div class="gallery" id="gallery"></div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>© 2026 Portfolio · 用心创作，用审美表达</p>
+</footer>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Upload Form Modal (hidden by default) -->
+<div id="uploadFormContainer"></div>
+
+<!-- Detail Modal (hidden by default) -->
+<div id="detailModalContainer"></div>
+
+<script>
+// ===== Data Store =====
+const STORAGE_KEY = 'portfolio_works';
+
+function loadWorks() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveWorks(works) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(works));
+}
+
+let works = loadWorks();
+let currentFilter = 'all';
+
+// ===== Utility =====
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+  return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function getTypeLabel(type) {
+  const map = { photo: '📷 照片', video: '🎬 视频', text: '✍️ 文字', idea: '💡 创意' };
+  return map[type] || type;
+}
+
+function getTypeIcon(type) {
+  const map = { photo: '🖼️', video: '🎥', text: '📝', idea: '💡' };
+  return map[type] || '📄';
+}
+
+// ===== Toast =====
+function showToast(msg) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ===== Ripple Effect =====
+function createRipple(e, el) {
+  const rect = el.getBoundingClientRect();
+  const ripple = document.createElement('span');
+  ripple.className = 'card-ripple';
+  const size = Math.max(rect.width, rect.height);
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  el.appendChild(ripple);
+  ripple.classList.add('animate');
+  ripple.addEventListener('animationend', () => ripple.remove());
+}
+
+// ===== Upload =====
+let selectedType = 'photo';
+let pendingFile = null;
+
+function scrollToUpload() {
+  document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function openUploadForm() {
+  const container = document.getElementById('uploadFormContainer');
+  container.innerHTML = `
+    <div class="upload-form-overlay" id="uploadOverlay" onclick="if(event.target===this)closeUploadForm()">
+      <div class="upload-form" onclick="event.stopPropagation()">
+        <h3>上传新作品</h3>
+        <div class="form-group">
+          <label>作品类型</label>
+          <select id="uploadType" onchange="onTypeChange()">
+            <option value="photo">📷 照片</option>
+            <option value="video">🎬 视频</option>
+            <option value="text">✍️ 文字</option>
+            <option value="idea">💡 创意</option>
+          </select>
+        </div>
+        <div class="form-group" id="fileGroup">
+          <label>选择文件</label>
+          <input type="file" id="uploadFile" accept="image/*,video/*" onchange="onFileSelected(event)">
+          <div class="file-preview" id="filePreview"></div>
+        </div>
+        <div class="form-group">
+          <label>作品标题</label>
+          <input type="text" id="uploadTitle" placeholder="给作品起个名字...">
+        </div>
+        <div class="form-group">
+          <label>描述 / 创作想法</label>
+          <textarea id="uploadDesc" placeholder="说说这幅作品背后的故事或想法..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="closeUploadForm()">取消</button>
+          <button class="btn btn-accent ripple" onclick="submitWork()">发布作品</button>
+        </div>
+      </div>
+    </div>
+  `;
+  selectedType = 'photo';
+  pendingFile = null;
+  updateFileInputState();
+}
+
+function closeUploadForm() {
+  document.getElementById('uploadFormContainer').innerHTML = '';
+}
+
+function onTypeChange() {
+  selectedType = document.getElementById('uploadType').value;
+  pendingFile = null;
+  updateFileInputState();
+  document.getElementById('filePreview').innerHTML = '';
+}
+
+function updateFileInputState() {
+  const fileGroup = document.getElementById('fileGroup');
+  const fileInput = document.getElementById('uploadFile');
+  if (selectedType === 'text' || selectedType === 'idea') {
+    fileGroup.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+  } else {
+    fileGroup.style.display = 'block';
+  }
+}
+
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  pendingFile = file;
+  const preview = document.getElementById('filePreview');
+  const url = URL.createObjectURL(file);
+  if (file.type.startsWith('image/')) {
+    preview.innerHTML = `<img src="${url}" alt="预览">`;
+  } else if (file.type.startsWith('video/')) {
+    preview.innerHTML = `<video src="${url}" controls></video>`;
+  } else {
+    preview.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;">${file.name}</p>`;
+  }
+}
+
+function submitWork() {
+  const title = document.getElementById('uploadTitle').value.trim();
+  const desc = document.getElementById('uploadDesc').value.trim();
+  const type = document.getElementById('uploadType').value;
+
+  if (!title) { showToast('请填写作品标题'); return; }
+  if (!desc) { showToast('请填写作品描述'); return; }
+
+  if (type === 'photo' || type === 'video') {
+    if (!pendingFile) { showToast('请选择文件'); return; }
+    const reader = new FileReader();
+    reader.onload = function() {
+      const work = {
+        id: genId(),
+        type: type,
+        title: title,
+        desc: desc,
+        dataUrl: reader.result,
+        fileName: pendingFile.name,
+        mimeType: pendingFile.type,
+        createdAt: Date.now(),
+      };
+      works.unshift(work);
+      saveWorks(works);
+      closeUploadForm();
+      refreshAll();
+      showToast('作品发布成功 ✨');
+    };
+    reader.readAsDataURL(pendingFile);
+  } else {
+    const work = {
+      id: genId(),
+      type: type,
+      title: title,
+      desc: desc,
+      dataUrl: null,
+      createdAt: Date.now(),
+    };
+    works.unshift(work);
+    saveWorks(works);
+    closeUploadForm();
+    refreshAll();
+    showToast('作品发布成功 ✨');
+  }
+}
+
+// ===== Gallery Rendering =====
+function renderGallery() {
+  const gallery = document.getElementById('gallery');
+  const filtered = currentFilter === 'all' ? works : works.filter(w => w.type === currentFilter);
+
+  if (filtered.length === 0) {
+    gallery.className = 'gallery empty';
+    gallery.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <p>还没有作品，快来上传第一个吧</p>
+      </div>
+    `;
+    return;
+  }
+
+  gallery.className = 'gallery';
+  gallery.innerHTML = filtered.map((w, i) => {
+    const mediaHtml = renderCardMedia(w);
+    return `
+      <div class="card" data-id="${w.id}" style="animation: fadeUp 0.5s var(--transition-spring) both; animation-delay: ${i * 0.06}s;"
+           onclick="openDetail('${w.id}', event)">
+        <div class="card-media">
+          ${mediaHtml}
+          <span class="card-type-badge">${getTypeLabel(w.type)}</span>
+        </div>
+        <div class="card-body">
+          <h3>${escapeHtml(w.title)}</h3>
+          <p>${escapeHtml(w.desc)}</p>
+          <div class="card-meta">${formatDate(w.createdAt)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCardMedia(w) {
+  if (w.type === 'photo' && w.dataUrl) {
+    return `<img src="${w.dataUrl}" alt="${escapeHtml(w.title)}" loading="lazy">`;
+  }
+  if (w.type === 'video' && w.dataUrl) {
+    return `<video src="${w.dataUrl}" muted preload="metadata"></video>`;
+  }
+  return `<span class="media-placeholder">${getTypeIcon(w.type)}</span>`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ===== Detail Modal =====
+function openDetail(id, event) {
+  if (event) {
+    // Create ripple on the card
+    const card = event.currentTarget;
+    createRipple(event, card);
+  }
+
+  const w = works.find(wk => wk.id === id);
+  if (!w) return;
+
+  const container = document.getElementById('detailModalContainer');
+  let mediaHtml = '';
+  if ((w.type === 'photo' || w.type === 'video') && w.dataUrl) {
+    mediaHtml = `
+      <div class="modal-media">
+        ${w.type === 'photo'
+          ? `<img src="${w.dataUrl}" alt="${escapeHtml(w.title)}">`
+          : `<video src="${w.dataUrl}" controls autoplay playsinline></video>`}
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="modal-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+      <div class="modal">
+        <button class="modal-close" onclick="closeDetail()">✕</button>
+        ${mediaHtml}
+        <div class="modal-content">
+          <div class="modal-type">${getTypeLabel(w.type)}</div>
+          <h3>${escapeHtml(w.title)}</h3>
+          <p>${escapeHtml(w.desc)}</p>
+          <div class="modal-date">${formatDate(w.createdAt)}</div>
+          <div class="modal-actions">
+            <button class="btn btn-delete" onclick="deleteWork('${w.id}')">🗑 删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetail() {
+  document.getElementById('detailModalContainer').innerHTML = '';
+  document.body.style.overflow = '';
+}
+
+function deleteWork(id) {
+  if (!confirm('确定要删除这个作品吗？')) return;
+  works = works.filter(w => w.id !== id);
+  saveWorks(works);
+  closeDetail();
+  refreshAll();
+  showToast('作品已删除');
+}
+
+// ===== Filter =====
+function setupFilters() {
+  const btns = document.querySelectorAll('.filter-btn');
+  btns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      btns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      // ripple on filter button
+      const fakeEvent = { clientX: this.getBoundingClientRect().left + this.offsetWidth/2, clientY: this.getBoundingClientRect().top + this.offsetHeight/2 };
+      currentFilter = this.dataset.filter;
+      renderGallery();
+    });
+  });
+}
+
+function updateFilterCounts() {
+  const counts = { all: works.length, photo: 0, video: 0, text: 0, idea: 0 };
+  works.forEach(w => { if (counts[w.type] !== undefined) counts[w.type]++; });
+  document.getElementById('countAll').textContent = counts.all;
+  document.getElementById('countPhoto').textContent = counts.photo;
+  document.getElementById('countVideo').textContent = counts.video;
+  document.getElementById('countText').textContent = counts.text;
+  document.getElementById('countIdea').textContent = counts.idea;
+}
+
+// ===== Global ripple for buttons =====
+function setupButtonRipples() {
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.ripple');
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 2;
+    btn.style.setProperty('--ripple-size', size + 'px');
+    btn.style.setProperty('--ripple-x', (e.clientX - rect.left - size / 2) + 'px');
+    btn.style.setProperty('--ripple-y', (e.clientY - rect.top - size / 2) + 'px');
+    btn.classList.add('animating');
+    btn.addEventListener('animationend', function() {
+      btn.classList.remove('animating');
+    }, { once: true });
+  });
+}
+
+// ===== Drag & Drop on Upload Zone =====
+function setupDragDrop() {
+  const zone = document.getElementById('uploadZone');
+  if (!zone) return;
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    zone.addEventListener(evt, function(e) {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    zone.addEventListener(evt, function(e) {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+    });
+  });
+
+  zone.addEventListener('drop', function(e) {
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      openUploadForm();
+      // defer setting file until form renders
+      setTimeout(() => {
+        const input = document.getElementById('uploadFile');
+        if (input) {
+          const dt = new DataTransfer();
+          dt.items.add(files[0]);
+          input.files = dt.files;
+          onFileSelected({ target: input });
+          pendingFile = files[0];
+        }
+      }, 100);
+    }
+  });
+}
+
+// ===== Nav Scroll Effect =====
+function setupNavScroll() {
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > 40) {
+      nav.classList.add('scrolled');
+    } else {
+      nav.classList.remove('scrolled');
+    }
+  });
+}
+
+// ===== Refresh All =====
+function refreshAll() {
+  renderGallery();
+  updateFilterCounts();
+}
+
+// ===== Init =====
+function init() {
+  setupButtonRipples();
+  setupFilters();
+  setupDragDrop();
+  setupNavScroll();
+  refreshAll();
+
+  // Re-setup filter buttons after render (they are already in DOM)
+  // Actually we need to re-bind after refreshAll because filter bar is static
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// Re-bind filter clicks after gallery renders might change things — but filter bar is static
+// so setup once is fine. However, refreshAll doesn't touch filter bar HTML, so counts update is fine.
+
+// Handle keyboard: ESC to close modals
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeDetail();
+    closeUploadForm();
+  }
+});
+</script>
+
+</body>
+</html>
