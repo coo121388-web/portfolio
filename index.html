@@ -18,6 +18,9 @@
     --text-tertiary: #555;
     --accent: #ff4d4d;
     --accent-glow: rgba(255, 77, 77, 0.3);
+    --canvas-base: rgba(8, 8, 10, 0.18);
+    --canvas-particle: 210, 210, 225;
+    --canvas-line: 190, 190, 215;
     --radius: 16px;
     --radius-sm: 10px;
     --transition-fast: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -26,14 +29,31 @@
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   }
 
+  /* Light theme */
+  [data-theme="light"] {
+    --bg: #f5f5f7;
+    --surface: rgba(255, 255, 255, 0.82);
+    --surface-hover: rgba(248, 248, 250, 0.88);
+    --border: #d1d1d6;
+    --text-primary: #1a1a1c;
+    --text-secondary: #6e6e73;
+    --text-tertiary: #aeaeb2;
+    --accent: #e64545;
+    --accent-glow: rgba(230, 69, 69, 0.2);
+    --canvas-base: rgba(240, 240, 245, 0.25);
+    --canvas-particle: 120, 120, 140;
+    --canvas-line: 140, 140, 160;
+  }
+
   html { scroll-behavior: smooth; }
   body {
     font-family: var(--font);
-    background: #0a0a0a;
+    background: var(--bg);
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.5s ease, color 0.5s ease;
   }
 
   /* ===== Flowing Background Canvas ===== */
@@ -89,7 +109,7 @@
     transition: background 0.3s, backdrop-filter 0.3s;
   }
   .nav.scrolled {
-    background: rgba(10, 10, 10, 0.75);
+    background: var(--surface);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border-bottom: 1px solid var(--border);
@@ -108,6 +128,33 @@
     gap: 12px;
     align-items: center;
   }
+
+  /* Theme Toggle */
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+  }
+  .theme-toggle:hover {
+    border-color: var(--text-secondary);
+    transform: scale(1.08);
+  }
+  .theme-toggle:active { transform: scale(0.94); }
+  .theme-toggle .theme-icon-light { display: none; }
+  .theme-toggle .theme-icon-dark  { display: inline; }
+
+  [data-theme="light"] .theme-toggle .theme-icon-dark  { display: none; }
+  [data-theme="light"] .theme-toggle .theme-icon-light { display: inline; }
 
   /* ===== Buttons ===== */
   .btn {
@@ -675,6 +722,10 @@
 <nav class="nav" id="nav">
   <a href="#" class="nav-logo">Port<span>folio</span></a>
   <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" aria-label="切换深色/亮色模式" title="切换深色/亮色模式">
+      <span class="theme-icon-dark">☀️</span>
+      <span class="theme-icon-light">🌙</span>
+    </button>
     <button class="btn btn-outline ripple" onclick="scrollToUpload()">上传作品</button>
   </div>
 </nav>
@@ -1152,6 +1203,57 @@ document.addEventListener('DOMContentLoaded', init);
 // Re-bind filter clicks after gallery renders might change things — but filter bar is static
 // so setup once is fine. However, refreshAll doesn't touch filter bar HTML, so counts update is fine.
 
+// ===== Theme Toggle =====
+(function() {
+  const THEME_KEY = 'portfolio_theme';
+  const toggle = document.getElementById('themeToggle');
+
+  function getTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved) return saved;
+    // Default: respect OS preference, fallback to dark
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    localStorage.setItem(THEME_KEY, theme);
+  }
+
+  // Init
+  applyTheme(getTheme());
+
+  // Toggle on click
+  toggle.addEventListener('click', function() {
+    const current = document.documentElement.hasAttribute('data-theme') ? 'light' : 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    // Ripple
+    const rect = toggle.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    ripple.className = 'card-ripple';
+    const size = 50;
+    ripple.style.width = ripple.style.height = size + 'px';
+    ripple.style.left = (rect.width / 2 - size / 2) + 'px';
+    ripple.style.top = (rect.height / 2 - size / 2) + 'px';
+    toggle.appendChild(ripple);
+    ripple.classList.add('animate');
+    ripple.addEventListener('animationend', () => ripple.remove());
+    applyTheme(next);
+  });
+
+  // Listen for OS theme changes
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+    // Only follow OS if user hasn't manually set a preference
+    if (!localStorage.getItem(THEME_KEY)) {
+      applyTheme(e.matches ? 'light' : 'dark');
+    }
+  });
+})();
+
 // Handle keyboard: ESC to close modals
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
@@ -1214,7 +1316,13 @@ document.addEventListener('keydown', function(e) {
     requestAnimationFrame(draw);
 
     // Fade trail: semi-transparent clear for motion blur effect
-    ctx.fillStyle = 'rgba(8, 8, 10, 0.18)';
+    const isLight = document.documentElement.hasAttribute('data-theme');
+    const trailColor = isLight ? 'rgba(240, 240, 245, 0.22)' : 'rgba(8, 8, 10, 0.18)';
+    const particleRGB = isLight ? '110, 110, 135' : '210, 210, 225';
+    const glowRGB = isLight ? '130, 130, 155' : '195, 195, 215';
+    const lineRGB = isLight ? '130, 130, 160' : '190, 190, 215';
+
+    ctx.fillStyle = trailColor;
     ctx.fillRect(0, 0, W, H);
 
     const t = timestamp * 0.001;
@@ -1278,14 +1386,14 @@ document.addEventListener('keydown', function(e) {
       const alpha = p.opacity * (0.7 + 0.3 * Math.sin(t * 1.1 + p.phaseX));
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(210, 210, 225, ${alpha})`;
+      ctx.fillStyle = `rgba(${particleRGB}, ${alpha})`;
       ctx.fill();
 
       // Larger glow on every 6th particle
       if (i % 6 === 0) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r * 2.8, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(195, 195, 215, ${alpha * 0.14})`;
+        ctx.fillStyle = `rgba(${glowRGB}, ${alpha * 0.14})`;
         ctx.fill();
       }
     }
@@ -1316,7 +1424,7 @@ document.addEventListener('keydown', function(e) {
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = `rgba(190, 190, 215, ${lineAlpha})`;
+          ctx.strokeStyle = `rgba(${lineRGB}, ${lineAlpha})`;
           ctx.lineWidth = 0.35;
           ctx.stroke();
         }
